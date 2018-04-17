@@ -12,10 +12,13 @@
 
 #define epsilon 0.000000000000000222
 
+using namespace std;
+
 int main(int argc, char* argv[]){
-	
+
 	if( argc != 10){
 		printf("Usage: %s numParticlesLight numParticleMedium numParticleHeavy numSteps subSteps timeSubStep imageWidth imageHeight imageFilenamePrex\n", argv[0]);
+		exit(EXIT_FAILURE);
 	}
 
 	MPI_Init(&argc,&argv);
@@ -40,9 +43,6 @@ int main(int argc, char* argv[]){
 
 	//root node stuff goes here
 	if(my_rank == 0){
-
-
-
 		//almost done, just save the image
 		saveBMP(argv[9], image, width, height);
 	}
