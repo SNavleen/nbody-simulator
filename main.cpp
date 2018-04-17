@@ -12,47 +12,43 @@
 
 #define epsilon 0.000000000000000222
 
-using namespace std;
+int main(int argc, char *argv[]) {
+  if (argc != 10) {
+    printf(
+      "Usage: %s numParticlesLight numParticleMedium numParticleHeavy numSteps subSteps timeSubStep imageWidth imageHeight imageFilenamePrex\n",
+      argv[0]);
+  }
 
-int main(int argc, char* argv[]){
+  MPI_Init(&argc, &argv);
 
-	if( argc != 10){
-		printf("Usage: %s numParticlesLight numParticleMedium numParticleHeavy numSteps subSteps timeSubStep imageWidth imageHeight imageFilenamePrex\n", argv[0]);
-		exit(EXIT_FAILURE);
-	}
+  int p, my_rank;
 
-	MPI_Init(&argc,&argv);
+  MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+  MPI_Comm_size(MPI_COMM_WORLD, &p);
 
-	int p, my_rank;
+  // variables
+  int numParticlesLight = 0;
+  int numParticleMedium = 0;
+  int numParticleHeavy  = 0;
 
-	MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
-	MPI_Comm_size(MPI_COMM_WORLD, &p);
+  int numSteps = 0;
+  int subSteps = 0;
+  double timeSubStep;
 
-	//variables
-	int numParticlesLight = 0;
-	int numParticleMedium = 0;
-	int numParticleHeavy = 0;
+  int width, height;
 
-	int numSteps = 0;
-	int subSteps = 0;
-	double timeSubStep;
+  unsigned char *image;
 
-	int width, height;
+  // root node stuff goes here
+  if (my_rank == 0) {
+    // almost done, just save the image
+    saveBMP(argv[9], image, width, height);
+  }
+  // all other nodes do this
+  else {}
 
-	unsigned char* image;
+  // free(image);
 
-	//root node stuff goes here
-	if(my_rank == 0){
-		//almost done, just save the image
-		saveBMP(argv[9], image, width, height);
-	}
-	//all other nodes do this
-	else{
-
-	}
-
-	free(image);
-
-	MPI_Finalize();
-	return 0;
+  MPI_Finalize();
+  return 0;
 }
