@@ -15,7 +15,7 @@
 using namespace std;
 
 int main(int argc, char* argv[]){
-
+//test
 	if( argc != 10){
 		printf("Usage: %s numParticlesLight numParticleMedium numParticleHeavy numSteps subSteps timeSubStep imageWidth imageHeight imageFilenamePrex\n", argv[0]);
 		exit(EXIT_FAILURE);
