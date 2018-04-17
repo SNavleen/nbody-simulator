@@ -49,8 +49,19 @@ for (x=0; x<N; x++){
   }
 }
 // reduced alogirthm
-for (q=0; q<N; q++){
-  p.force[i] =0;
+for (x=0; x<N; x++){
+  // q = x-th particle
 
-  //
+  q.force[i] =0;
+}
+// for each other particle that is not q in the same N particles
+for(y=0; y<N; y++){
+  // k = y-th particle
+
+  if (k!=q){
+    // compute f(qk,i) -- see slide because i'm confused
+    q.force[i] = q.force[i] + f(qk,i)
+    k.force[i] = k.force[i] + f(qk,i)
+
+  }
 }
