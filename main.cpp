@@ -5,6 +5,8 @@
 
 #include <mpi.h>
 #include <math.h>
+#include <time.h>       /* time */
+
 
 #include "vector3d.h"
 #include "savebmp.h"
@@ -14,10 +16,66 @@
 
 typedef struct {
 	vec3 position;
-	// double velocity;
-	// double acceleration;
-	// double mass;
+	vec3 velocity;
+	vec3 acceleration;
+	double mass;
 } particleVect;
+
+void lightInit(int num, int width, int height){
+	particleVect lightParticles[num];
+	double range = velocityLightMax-velocityLightMin;
+	double massRange = massLightMax-massLightMin;
+	for(int i = 0; i <num; i++){
+		double x = drand48()*width;
+		double y = drand48()*height;
+		double z = drand48();
+		lightParticles[i].position = vec3(x,y,z);
+		double vx = (drand48()*range)+velocityLightMin;
+		double vy = (drand48()*range)+velocityLightMin;
+		double vz = drand48();
+		lightParticles[i].velocity = vec3(vx,vy,vz);
+		lightParticles[i].acceleration = vec3(0,0,0);
+		lightParticles[i].mass = (drand48()*massRange)+massLightMin;
+		//printf("i: %d, x: %f, y: %f, z: %f\n", i, lightParticles[i].position.x,lightParticles[i].position.y,lightParticles[i].position.z );
+	}
+}
+void mediumInit(int num, int width, int height){
+	particleVect mediumParticles[num];
+	double range = velocityMediumMax-velocityMediumMin;
+	double massRange = massMediumMax-massMediumMin;
+	for(int i = 0; i <num; i++){
+		double x = drand48()*width;
+		double y = drand48()*height;
+		double z = drand48();
+		mediumParticles[i].position = vec3(x,y,z);
+		double vx = (drand48()*range)+velocityMediumMin;
+		double vy = (drand48()*range)+velocityMediumMin;
+		double vz = drand48();
+		mediumParticles[i].velocity = vec3(vx,vy,vz);
+		mediumParticles[i].acceleration = vec3(0,0,0);
+		mediumParticles[i].mass = (drand48()*massRange)+massMediumMin;
+		//printf("i: %d, x: %f, y: %f, z: %f\n", i, mediumParticles[i].position.x,mediumParticles[i].position.y,mediumParticles[i].position.z );
+	}
+}
+void heavyInit(int num, int width, int height){
+	particleVect heavyParticles[num];
+	double range = velocityHeavyMax-velocityHeavyMin;
+	double massRange = massHeavyMax-massHeavyMin;
+	for(int i = 0; i <num; i++){
+		double x = drand48()*width;
+		double y = drand48()*height;
+		double z = drand48();
+		heavyParticles[i].position = vec3(x,y,z);
+		double vx = (drand48()*range)+velocityHeavyMin;
+		double vy = (drand48()*range)+velocityHeavyMin;
+		double vz = drand48();
+		heavyParticles[i].velocity = vec3(vx,vy,vz);
+		heavyParticles[i].acceleration = vec3(0,0,0);
+		heavyParticles[i].mass = (drand48()*massRange)+massHeavyMin;
+		//printf("i: %d, x: %f, y: %f, z: %f\n", i, heavyParticles[i].position.x,heavyParticles[i].position.y,heavyParticles[i].position.z );
+	}
+}
+
 
 int main(int argc, char *argv[]) {
   if (argc != 10) {
@@ -25,6 +83,8 @@ int main(int argc, char *argv[]) {
       "Usage: %s numParticlesLight numParticleMedium numParticleHeavy numSteps subSteps timeSubStep imageWidth imageHeight imageFilenamePrex\n",
       argv[0]);
   }
+	srand48(time(NULL));
+
 
   MPI_Init(&argc, &argv);
 
@@ -34,43 +94,28 @@ int main(int argc, char *argv[]) {
   MPI_Comm_size(MPI_COMM_WORLD, &p);
 
   // variables
-  int numParticlesLight = 5;
-  int numParticleMedium = 0;
-  int numParticleHeavy  = 0;
+  int numParticlesLight = atoi(argv[1]);
+  int numParticlesMedium = atoi(argv[2]);
+  int numParticlesHeavy  = atoi(argv[3]);
 
-  int numSteps = 0;
-  int subSteps = 0;
-  double timeSubStep;
+  int numSteps = atoi(argv[4]);
+  int subSteps = atoi(argv[5]);
+  double timeSubStep = atof(argv[6]);
 
-  int width, height;
+  int width = atoi(argv[7]);
+	int height = atoi(argv[8]);
 
   unsigned char *image;
+
+	lightInit(numParticlesLight,width,height);
+	mediumInit(numParticlesMedium,width,height);
+	heavyInit(numParticlesHeavy,width,height);
 
   // root node stuff goes here
   if (my_rank == 0) {
     // almost done, just save the image
     //saveBMP(argv[9], image, width, height);
-		particleVect lightParticles[numParticlesLight];
-		double range = velocityLightMax-velocityLightMin;
-		double massRange = massLightMax-massLightMin;
-		for(int i = 0; i <numParticlesLight; i++){
-			double position[3];
-			double x = (drand48()*range)+velocityLightMin;
-			double y = (drand48()*range)+velocityLightMin;
-			double z = drand48();
-			lightParticles[i].position =  vec3(x,y,z);
-			// lightParticles[i].position.x = (drand48()*range)+velocityLightMin;
-			// lightParticles[i].position.y = (drand48()*range)+velocityLightMin;
-			// lightParticles[i].position.z = drand48();
-			// lightParticles[i].velocity.x = drand48();
-			// lightParticles[i].velocity.y = drand48();
-			// lightParticles[i].velocity.z = drand48();
-			// lightParticles[i].acceleration.x = 0;
-			// lightParticles[i].acceleration.y = 0;
-			// lightParticles[i].acceleration.z = 0;
-			// lightParticles[i].mass = (drand48()*massRange)+massLightMin;
-			printf("i: %d, x: %f, y: %f, z: %f\n", i, lightParticles[i].position.x,lightParticles[i].position.y,lightParticles[i].position.z );
-		}
+
   }
   // all other nodes do this
   else {}
