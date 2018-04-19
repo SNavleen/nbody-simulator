@@ -12,16 +12,10 @@
 #include "properties.h"
 
 #define epsilon 0.000000000000000222
+#define particleRadius 20
 
 using namespace std;
 
-
-typedef struct {
-  vec3   position;
-  vec3   velocity;
-  vec3   force;
-  double mass;
-} Particle;
 
 typedef struct {
   double const velocityMin;
@@ -30,6 +24,16 @@ typedef struct {
   double const massMax;
   vec3 const   colour;
 } ParticleProperties;
+
+typedef struct {
+  vec3   position;
+  vec3   velocity;
+  vec3   force;
+  double mass;
+  vec3   colour;
+  int    radius;
+} Particle;
+
 
 void particlesInit(int                startIndex,
                    int                endIndex,
@@ -41,13 +45,31 @@ void updateParticles(int       numParticles,
                      int       h,
                      Particle *oldParticles,
                      Particle *newParticles);
-void particleToImg(int            h,
-                   int            w,
-                   unsigned char *img,
-                   Particle      *particles);
+void imgInit(int            h,
+             int            w,
+             unsigned char *img);
+void imgUpdate(Particle const *particles,
+               int             numParticles,
+               unsigned char  *img,
+               int             height,
+               int             width);
+void putpixel(int            x,
+              int            y,
+              unsigned char *img,
+              int            width,
+              vec3           colour);
 
 const float G = 6.67300E-11;
 int p, my_rank;
+
+ParticleProperties lightProperties =
+{ velocityLightMin, velocityLightMax, massLightMin, massLightMin, colourLight };
+ParticleProperties mediumProperties =
+{ velocityMediumMin, velocityMediumMax, massMediumMin, massMediumMin,
+  colourMedium };
+ParticleProperties heavyProperties =
+{ velocityHeavyMin, velocityHeavyMax, massHeavyMin, massHeavyMin, colourHeavy };
+
 
 int main(int argc, char *argv[]) {
   if (argc != 10) {
@@ -77,14 +99,10 @@ int main(int argc, char *argv[]) {
 
   int totalParticles = numParticlesLight + numParticlesMedium + numParticlesHeavy;
 
-  ParticleProperties lightProperties = {velocityLightMin, velocityLightMax, massLightMin, massLightMin, colourLight};
-  ParticleProperties mediumProperties = {velocityMediumMin, velocityMediumMax, massMediumMin, massMediumMin, colourMedium};
-  ParticleProperties heavyProperties = {velocityHeavyMin, velocityHeavyMax, massHeavyMin, massHeavyMin, colourHeavy};
-
   Particle *particlesOld = (Particle *)malloc(totalParticles * sizeof(Particle));
   Particle *particlesNew = (Particle *)malloc(totalParticles * sizeof(Particle));
 
-  unsigned char *image = (unsigned char *)malloc(height * width * 9);
+  unsigned char *image = (unsigned char *)malloc(height * width * 3);
 
   // root node stuff goes here
   if (my_rank == 0) {
@@ -109,14 +127,21 @@ int main(int argc, char *argv[]) {
                       timeSubStep,
                       particlesOld,
                       particlesNew);
-      swap(particlesOld, particlesNew);
-    if (i % numSteps == 0) {
-		printf("Rank %d - i: %d\n", my_rank, i);
-     particleToImg(height, width, image, particlesNew);
-     saveBMP(argv[9], image, width, height);
-    }
-    // almost done, just save the image
-    // saveBMP(argv[9], image, width, height);
+      swap(*particlesOld, *particlesNew);
+      if (i % numSteps == 0) {
+        // printf("Rank %d - i: %d\n", my_rank, i);
+        imgInit(height, width, image);
+        imgUpdate(particlesOld, totalParticles, image, height, width);
+        // int imageNumber  = i / numSteps;
+        string imageName = argv[9];
+        string extention = ".bmp";
+        // imageName += "_"
+        // imageName += to_string(imageNumber);
+        imageName += extention;
+        saveBMP(imageName.c_str(), image, width, height);
+      }
+      // almost done, just save the image
+      // saveBMP(argv[9], image, width, height);
     }
     // almost done, just save the image
     // saveBMP(argv[9], image, width, height);
@@ -143,23 +168,28 @@ void particlesInit(int                startIndex,
   for (int i = startIndex; i < endIndex; i++) {
     double x = drand48() * width;
     double y = drand48() * height;
-    double z = drand48();
+    // double z = drand48();
+    double z = 0;
     particles[i].position = vec3(x, y, z);
 
     double vx = (drand48() * range) + particleProperties.velocityMin;
     double vy = (drand48() * range) + particleProperties.velocityMin;
-    double vz = drand48();
+    // double vz = drand48();
+    double vz = 0;
     particles[i].velocity = vec3(vx, vy, vz);
 
     particles[i].mass = (drand48() * massRange) +
                         particleProperties.massMax;
 
-    // printf("Rank %d - i: %d, x: %f, y: %f, z: %f\n",
-    //        my_rank,
-    //        i,
-    //        particles[i].position.x,
-    //        particles[i].position.y,
-    //        particles[i].position.z);
+    particles[i].colour = particleProperties.colour;
+
+    particles[i].radius = particleRadius;
+    printf("Rank %d - i: %d, x: %f, y: %f, z: %f\n",
+           my_rank,
+           i,
+           particles[i].position.x,
+           particles[i].position.y,
+           particles[i].position.z);
   }
 }
 
@@ -173,7 +203,8 @@ void updateParticles(int       numParticles,
     for (int k = 0; k < numParticles; k++) {
       if (k != q) {
         vec3 diff = oldParticles[q].position - oldParticles[k].position;
-        oldParticles[q].force += diff * (oldParticles[k].mass / diff.Magnitude());
+        oldParticles[q].force += diff *
+                                 (oldParticles[k].mass / diff.Magnitude());
       }
     }
     oldParticles[q].force = oldParticles[q].force * (-G * oldParticles[q].mass);
@@ -184,13 +215,16 @@ void updateParticles(int       numParticles,
 
     newParticles[q].position = oldParticles[q].position +
                                (oldParticles[q].velocity * h);
+
+    newParticles[q].colour = oldParticles[q].colour;
+
+    newParticles[q].radius = oldParticles[q].radius;
   }
 }
 
-void particleToImg(int            h,
-                   int            w,
-                   unsigned char *img,
-                   Particle      *particles) {
+void imgInit(int            h,
+             int            w,
+             unsigned char *img) {
   for (int j = 0; j < h; j++) {
     for (int i = 0; i < w; i++) {
       img[(j * w + i) * 3 + 0] = 0;
@@ -198,4 +232,59 @@ void particleToImg(int            h,
       img[(j * w + i) * 3 + 2] = 0;
     }
   }
+}
+
+void imgUpdate(Particle const *particles,
+               int             numParticles,
+               unsigned char  *img,
+               int             height,
+               int             width) {
+  for (int q = 0; q < numParticles; q++) {
+    int y    =  particles[q].position.y - particles[q].radius;
+    int yEnd =  particles[q].position.y + particles[q].radius;
+    int x    =  particles[q].position.x - particles[q].radius;
+    int xEnd =  particles[q].position.x + particles[q].radius;
+    int r    = particles[q].radius;
+
+    long rIndex, gIndex, bIndex;
+    for (int h = y; h <= yEnd; h++) {
+      for (int w = x; w <= xEnd; w++) {
+        if ((h < 0) || (h >= height)) continue;
+        if ((w < 0) || (w >= width)) continue;
+        // putpixel(w, h, img, width, particles[q].colour);
+        if (sqrt(w * w + h * h) > r * r) {
+          // Get the RGB indexes
+          rIndex = (h * width + w) * 3 + 0;
+          gIndex = (h * width + w) * 3 + 1;
+          bIndex = (h * width + w) * 3 + 2;
+
+          img[rIndex] = 255;
+          img[gIndex] = 255;
+          img[bIndex] = 255;
+        } else {
+          // Get the RGB indexes
+          rIndex = (h * width + w) * 3 + 0;
+          gIndex = (h * width + w) * 3 + 1;
+          bIndex = (h * width + w) * 3 + 2;
+
+          img[rIndex] = particles[q].colour.z * 255;
+          img[gIndex] = particles[q].colour.y * 255;
+          img[bIndex] = particles[q].colour.x * 255;
+        }
+      }
+    }
+  }
+}
+
+void putpixel(int x, int y, unsigned char  *img, int width, vec3 colour) {
+  long rIndex, gIndex, bIndex;
+
+  // Get the RGB indexes
+  rIndex = (y * width + x) * 3 + 0;
+  gIndex = (y * width + x) * 3 + 1;
+  bIndex = (y * width + x) * 3 + 2;
+
+  img[rIndex] = colour.z * 255;
+  img[gIndex] = colour.y * 255;
+  img[bIndex] = colour.x * 255;
 }
