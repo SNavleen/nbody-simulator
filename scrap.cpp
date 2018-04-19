@@ -19,8 +19,11 @@ h = subtimesteps
 /* particle q properties */
 q.speed[i+1] = q.speed[i] + h * q.velocity[i];
 q.velocity[i+1] = q.velocity[i] + h * q.F[i] / q.mass; // velocity = speed`
-q.acceleration = ?; // acceleration = speed``
 
+// the following is not from the slides, i just guessed it
+q.acceleration[i+1] = (q.velocity[i+1] - q.velocity[i]) / (t[i+1] - t[i]); // acceleration = speed``
+
+// this formula is wacky and from slide 9
 // other particle k exerts force on current particle q
 q.force[i] = (-G) * (q.mass * k.mass) / (distance between q and k) * (q.speed - k.speed);
 
@@ -36,15 +39,27 @@ for (x=0; x<N; x++){
     // k = y-th particle
 
     if (k!=q){
-      // compute f(qk,i) -- see slide because i'm confused
+      // compute f(qk,i) -- see slide 10 because i'm confused
       q.force[i] = q.force[i] + f(qk,i)
 
     }
   }
 }
-// reduced alogirthm
-for (q=0; q<N; q++){
-  p.force[i] =0;
 
-  //
+// reduced alogirthm
+for (x=0; x<N; x++){
+  // q = x-th particle
+
+  q.force[i] =0;
+}
+// for each other particle that is not q in the same N particles
+for(y=0; y<N; y++){
+  // k = y-th particle
+
+  if (k!=q){
+    // compute f(qk,i) -- see slide 10 because i'm confused
+    q.force[i] = q.force[i] + f(qk,i)
+    k.force[i] = k.force[i] + f(qk,i)
+
+  }
 }
