@@ -10,14 +10,8 @@ const float G  = 6.67300E-11;
 // Number of particles
 int N = 10;
 
-t[0] = 0; // initial value problem
-
-// we advance in time t[0] and computer at points t[i] where i > 0
-// speed[i] and velocity[i] are computed up to t[i]
-// note: speed and velocity are vectors while t is not
-
-// h = stepsize
-h = t[i+1] = i[i];
+// h = subtimesteps
+h = subtimesteps
 
 /*********************************************************/
 
