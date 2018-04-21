@@ -29,8 +29,8 @@ typedef struct {
   vec3   position;
   vec3   velocity;
   vec3   force;
-  double mass;
   vec3   colour;
+  double mass;
   int    radius;
 } Particle;
 
@@ -60,7 +60,24 @@ void putpixel(int            x,
               vec3           colour);
 
 const float G = 6.67300E-11;
+
+// MPI variables
 int p, my_rank;
+// Status of a MPI_Recv
+MPI_Status status;
+// Request of a MPI_Isend
+MPI_Request request;
+/* New Datatype for vec3 */
+MPI_Datatype mpi_vec3, mpi_Particle, mpiold_Particle[4];
+MPI_Aint     offsetsParticle[4], addrParticle[4];
+
+// Input variables
+int numParticlesLight, numParticlesMedium, numParticlesHeavy, numSteps, subSteps,
+    width, height;
+double timeSubStep;
+
+// Particle Informations
+int totalParticles;
 
 ParticleProperties lightProperties =
 { velocityLightMin, velocityLightMax, massLightMin, massLightMin, colourLight };
@@ -70,6 +87,7 @@ ParticleProperties mediumProperties =
 ParticleProperties heavyProperties =
 { velocityHeavyMin, velocityHeavyMax, massHeavyMin, massHeavyMin, colourHeavy };
 
+Particle *particlesOld, *particlesNew, *particlesNewLocal;
 
 int main(int argc, char *argv[]) {
   if (argc != 10) {
@@ -85,28 +103,59 @@ int main(int argc, char *argv[]) {
   MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
   MPI_Comm_size(MPI_COMM_WORLD, &p);
 
+  // New data type for vec3
+  MPI_Type_contiguous(3, MPI_DOUBLE, &mpi_vec3);
+  MPI_Type_commit(&mpi_vec3);
+
   // variables
-  int numParticlesLight  = atoi(argv[1]);
-  int numParticlesMedium = atoi(argv[2]);
-  int numParticlesHeavy  = atoi(argv[3]);
+  numParticlesLight  = atoi(argv[1]);
+  numParticlesMedium = atoi(argv[2]);
+  numParticlesHeavy  = atoi(argv[3]);
 
-  int numSteps       = atoi(argv[4]);
-  int subSteps       = atoi(argv[5]);
-  double timeSubStep = atof(argv[6]);
+  numSteps    = atoi(argv[4]);
+  subSteps    = atoi(argv[5]);
+  timeSubStep = atof(argv[6]);
 
-  int width  = atoi(argv[7]);
-  int height = atoi(argv[8]);
-
-  int totalParticles = numParticlesLight + numParticlesMedium + numParticlesHeavy;
-
-  Particle *particlesOld = (Particle *)malloc(totalParticles * sizeof(Particle));
-  Particle *particlesNew = (Particle *)malloc(totalParticles * sizeof(Particle));
+  width  = atoi(argv[7]);
+  height = atoi(argv[8]);
 
   unsigned char *image = (unsigned char *)malloc(height * width * 3);
 
+  totalParticles = numParticlesLight + numParticlesMedium + numParticlesHeavy;
+
+  particlesOld      = (Particle *)malloc(totalParticles * sizeof(Particle));
+  particlesNew      = (Particle *)malloc(totalParticles * sizeof(Particle));
+  particlesNewLocal = (Particle *)malloc((totalParticles / p) * sizeof(Particle));
+
+  // New data type for Particle struct
+  int blockLenParticle[4];
+  MPI_Get_address(particlesOld,          &addrParticle[0]);
+  MPI_Get_address(&particlesOld->colour, &addrParticle[1]);
+  MPI_Get_address(&particlesOld->mass,   &addrParticle[2]);
+  MPI_Get_address(&particlesOld->radius, &addrParticle[3]);
+  blockLenParticle[0] = 4;
+  blockLenParticle[1] = 1;
+  blockLenParticle[2] = 1;
+  blockLenParticle[3] = 1;
+  offsetsParticle[0]  = 0;
+  offsetsParticle[1]  = addrParticle[2] - addrParticle[0];
+  offsetsParticle[2]  = addrParticle[3] - addrParticle[0];
+  offsetsParticle[3]  = sizeof(Particle);
+  mpiold_Particle[0]  = mpi_vec3;
+  mpiold_Particle[1]  = MPI_DOUBLE;
+  mpiold_Particle[2]  = MPI_INT;
+  mpiold_Particle[3]  = MPI_UB;
+  MPI_Type_struct(4,
+                  blockLenParticle,
+                  offsetsParticle,
+                  mpiold_Particle,
+                  &mpi_Particle);
+  MPI_Type_commit(&mpi_Particle);
+
+
   // root node stuff goes here
   if (my_rank == 0) {
-    printf("Rank %d - totalParticles: %d\n", my_rank, totalParticles);
+    // printf("Rank %d - totalParticles: %d\n", my_rank, totalParticles);
     particlesInit(0, numParticlesLight,
                   width,
                   height,
@@ -122,11 +171,52 @@ int main(int argc, char *argv[]) {
                   height,
                   particlesOld,
                   heavyProperties);
-    for (int i = 0; i < numSteps * subSteps; i++) {
-      updateParticles(totalParticles,
-                      timeSubStep,
-                      particlesOld,
-                      particlesNew);
+    for (int dest = 0; dest < p; dest++) {
+      MPI_Isend(&totalParticles,
+                1,
+                MPI_INT,
+                dest,
+                0,
+                MPI_COMM_WORLD,
+                &request);
+    }
+  } else {
+    MPI_Recv(&totalParticles, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, &status);
+  }
+  for (int i = 0; i < numSteps * subSteps; i++) {
+    MPI_Bcast(&particlesOld[0], totalParticles, mpi_Particle, 0, MPI_COMM_WORLD);
+    //   printf("After Rank %d (particlesOld position) - x: %f, y: %f, z: %f\n",
+    //          my_rank,
+    //          particlesOld[0].position.x,
+    //          particlesOld[0].position.y,
+    //          particlesOld[0].position.z);
+    //  printf("After Rank %d (particlesOld velocity) - x: %f, y: %f, z: %f\n",
+    //         my_rank,
+    //         particlesOld[0].velocity.x,
+    //         particlesOld[0].velocity.y,
+    //         particlesOld[0].velocity.z);
+    //   printf("After Rank %d (particlesOld force) - x: %f, y: %f, z: %f\n",
+    //          my_rank,
+    //          particlesOld[0].force.x,
+    //          particlesOld[0].force.y,
+    //          particlesOld[0].force.z);
+    //  printf("After Rank %d (particlesOld colour) - x: %f, y: %f, z: %f\n",
+    //         my_rank,
+    //         particlesOld[0].colour.x,
+    //         particlesOld[0].colour.y,
+    //         particlesOld[0].colour.z);
+    // printf("After Rank %d (particlesOld) - mass: %f, radius: %d\n",
+    //                   my_rank,
+    //                   particlesOld[0].mass,
+    //                   particlesOld[0].radius);
+    updateParticles(totalParticles,
+                    timeSubStep,
+                    particlesOld,
+                    particlesNewLocal);
+    MPI_Gather(&particlesNewLocal[0], totalParticles / p, mpi_Particle,
+               &particlesNew[0], totalParticles / p, mpi_Particle, 0,
+               MPI_COMM_WORLD);
+    if (my_rank == 0) {
       swap(*particlesOld, *particlesNew);
       if (i % numSteps == 0) {
         // printf("Rank %d - i: %d\n", my_rank, i);
@@ -140,14 +230,8 @@ int main(int argc, char *argv[]) {
         imageName += extention;
         saveBMP(imageName.c_str(), image, width, height);
       }
-      // almost done, just save the image
-      // saveBMP(argv[9], image, width, height);
     }
-    // almost done, just save the image
-    // saveBMP(argv[9], image, width, height);
   }
-  // all other nodes do this
-  else {}
 
   // free(image);
 
@@ -184,12 +268,12 @@ void particlesInit(int                startIndex,
     particles[i].colour = particleProperties.colour;
 
     particles[i].radius = particleRadius;
-    printf("Rank %d - i: %d, x: %f, y: %f, z: %f\n",
-           my_rank,
-           i,
-           particles[i].position.x,
-           particles[i].position.y,
-           particles[i].position.z);
+    // printf("Rank %d - i: %d, x: %f, y: %f, z: %f\n",
+    //        my_rank,
+    //        i,
+    //        particles[i].position.x,
+    //        particles[i].position.y,
+    //        particles[i].position.z);
   }
 }
 
@@ -197,8 +281,12 @@ void updateParticles(int       numParticles,
                      int       h,
                      Particle *oldParticles,
                      Particle *newParticles) {
+  int startIndex = my_rank * (numParticles / p);
+  int endIndex   = startIndex + (numParticles / p);
+  int i          = 0;
+
   // Basic alogirthm
-  for (int q = 0; q < numParticles; q++) {
+  for (int q = startIndex; q < endIndex; q++) {
     // for each other particle that is not q in the same N particles
     for (int k = 0; k < numParticles; k++) {
       if (k != q) {
@@ -209,16 +297,17 @@ void updateParticles(int       numParticles,
     }
     oldParticles[q].force = oldParticles[q].force * (-G * oldParticles[q].mass);
 
-    newParticles[q].velocity = oldParticles[q].velocity +
+    newParticles[i].velocity = oldParticles[q].velocity +
                                ((oldParticles[q].force * h) /
                                 oldParticles[q].mass);
 
-    newParticles[q].position = oldParticles[q].position +
+    newParticles[i].position = oldParticles[q].position +
                                (oldParticles[q].velocity * h);
 
-    newParticles[q].colour = oldParticles[q].colour;
+    newParticles[i].colour = oldParticles[q].colour;
 
-    newParticles[q].radius = oldParticles[q].radius;
+    newParticles[i].radius = oldParticles[q].radius;
+    i++;
   }
 }
 
