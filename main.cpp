@@ -218,7 +218,6 @@ int main(int argc, char *argv[]) {
     MPI_Gather(&particlesNewLocal[0], totalParticles / p, mpi_Particle,
                &particlesNew[0], totalParticles / p, mpi_Particle, 0,
                MPI_COMM_WORLD);
-
     // printf(
     //   "Rank %d - particlesNew[0].position.x: %f, particlesNew[0].position.y: %f, particlesNew[0].radius: %d\n",
     //   my_rank,
