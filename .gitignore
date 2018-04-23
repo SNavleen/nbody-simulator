@@ -1,0 +1,6 @@
+*.o
+*.bmp
+*.sw*
+*.bmb
+scarp.cpp
+circle.cpp
