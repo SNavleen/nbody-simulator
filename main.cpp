@@ -185,37 +185,46 @@ int main(int argc, char *argv[]) {
   }
   for (int i = 0; i < numSteps * subSteps; i++) {
     MPI_Bcast(&particlesOld[0], totalParticles, mpi_Particle, 0, MPI_COMM_WORLD);
-    //   printf("After Rank %d (particlesOld position) - x: %f, y: %f, z: %f\n",
-    //          my_rank,
-    //          particlesOld[0].position.x,
-    //          particlesOld[0].position.y,
-    //          particlesOld[0].position.z);
-    //  printf("After Rank %d (particlesOld velocity) - x: %f, y: %f, z: %f\n",
+    // printf("After Rank %d (particlesOld position) - x: %f, y: %f, z: %f\n",
+    //        my_rank,
+    //        particlesOld[0].position.x,
+    //        particlesOld[0].position.y,
+    //        particlesOld[0].position.z);
+    // printf("After Rank %d (particlesOld velocity) - x: %f, y: %f, z: %f\n",
+    //        my_rank,
+    //        particlesOld[0].velocity.x,
+    //        particlesOld[0].velocity.y,
+    //        particlesOld[0].velocity.z);
+    //  printf("After Rank %d (particlesOld force) - x: %f, y: %f, z: %f\n",
     //         my_rank,
-    //         particlesOld[0].velocity.x,
-    //         particlesOld[0].velocity.y,
-    //         particlesOld[0].velocity.z);
-    //   printf("After Rank %d (particlesOld force) - x: %f, y: %f, z: %f\n",
-    //          my_rank,
-    //          particlesOld[0].force.x,
-    //          particlesOld[0].force.y,
-    //          particlesOld[0].force.z);
-    //  printf("After Rank %d (particlesOld colour) - x: %f, y: %f, z: %f\n",
-    //         my_rank,
-    //         particlesOld[0].colour.x,
-    //         particlesOld[0].colour.y,
-    //         particlesOld[0].colour.z);
+    //         particlesOld[0].force.x,
+    //         particlesOld[0].force.y,
+    //         particlesOld[0].force.z);
+    // printf("After Rank %d (particlesOld colour) - x: %f, y: %f, z: %f\n",
+    //        my_rank,
+    //        particlesOld[0].colour.x,
+    //        particlesOld[0].colour.y,
+    //        particlesOld[0].colour.z);
     // printf("After Rank %d (particlesOld) - mass: %f, radius: %d\n",
     //                   my_rank,
     //                   particlesOld[0].mass,
     //                   particlesOld[0].radius);
+
     updateParticles(totalParticles,
                     timeSubStep,
                     particlesOld,
                     particlesNewLocal);
+
     MPI_Gather(&particlesNewLocal[0], totalParticles / p, mpi_Particle,
                &particlesNew[0], totalParticles / p, mpi_Particle, 0,
                MPI_COMM_WORLD);
+
+    printf(
+      "Rank %d - particlesNew[0].position.x: %f, particlesNew[0].position.y: %f, particlesNew[0].radius: %d\n",
+      my_rank,
+      particlesNew[0].position.x,
+      particlesNew[0].position.y,
+      particlesNew[0].radius);
     if (my_rank == 0) {
       swap(*particlesOld, *particlesNew);
       if (i % numSteps == 0) {
@@ -268,12 +277,12 @@ void particlesInit(int                startIndex,
     particles[i].colour = particleProperties.colour;
 
     particles[i].radius = particleRadius;
-    // printf("Rank %d - i: %d, x: %f, y: %f, z: %f\n",
+    // printf("Rank %d - i: %d, x: %f, y: %f, r: %d\n",
     //        my_rank,
     //        i,
     //        particles[i].position.x,
     //        particles[i].position.y,
-    //        particles[i].position.z);
+    //        particles[i].radius);
   }
 }
 
@@ -286,6 +295,7 @@ void updateParticles(int       numParticles,
   int i          = 0;
 
   // Basic alogirthm
+  printf("startIndex: %d, endIndex: %d\n", startIndex, endIndex);
   for (int q = startIndex; q < endIndex; q++) {
     // for each other particle that is not q in the same N particles
     for (int k = 0; k < numParticles; k++) {
@@ -307,6 +317,12 @@ void updateParticles(int       numParticles,
     newParticles[i].colour = oldParticles[q].colour;
 
     newParticles[i].radius = oldParticles[q].radius;
+
+    // printf("Rank %d (newParticles position) - x: %f, y: %f, z: %f\n",
+    //        my_rank,
+    //        newParticles[i].position.x,
+    //        newParticles[i].position.y,
+    //        newParticles[i].position.z);
     i++;
   }
 }
@@ -335,31 +351,14 @@ void imgUpdate(Particle const *particles,
     int xEnd =  particles[q].position.x + particles[q].radius;
     int r    = particles[q].radius;
 
-    long rIndex, gIndex, bIndex;
     for (int h = y; h <= yEnd; h++) {
       for (int w = x; w <= xEnd; w++) {
         if ((h < 0) || (h >= height)) continue;
         if ((w < 0) || (w >= width)) continue;
-        // putpixel(w, h, img, width, particles[q].colour);
-        if (sqrt(w * w + h * h) > r * r) {
-          // Get the RGB indexes
-          rIndex = (h * width + w) * 3 + 0;
-          gIndex = (h * width + w) * 3 + 1;
-          bIndex = (h * width + w) * 3 + 2;
-
-          img[rIndex] = 255;
-          img[gIndex] = 255;
-          img[bIndex] = 255;
-        } else {
-          // Get the RGB indexes
-          rIndex = (h * width + w) * 3 + 0;
-          gIndex = (h * width + w) * 3 + 1;
-          bIndex = (h * width + w) * 3 + 2;
-
-          img[rIndex] = particles[q].colour.z * 255;
-          img[gIndex] = particles[q].colour.y * 255;
-          img[bIndex] = particles[q].colour.x * 255;
-        }
+        int dx = particles[q].position.x - w;
+        int dy = particles[q].position.y - h;
+        if ((dx * dx + dy * dy) > (r * r)) continue;
+        putpixel(w, h, img, width, particles[q].colour);
       }
     }
   }
