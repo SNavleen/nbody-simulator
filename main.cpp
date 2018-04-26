@@ -2,6 +2,7 @@
 #include <stdlib.h>
 
 #include <string.h>
+#include <cstring>
 
 #include <mpi.h>
 #include <math.h>
@@ -221,7 +222,7 @@ int main(int argc, char *argv[]) {
 
   // free(image);
   if(my_rank == 0){
-    printf("Running on %d processors with %d particles the total time is %f\n", p, totalTime, totalTime);
+    printf("Running on %d processors with %d particles the total time is %f\n", p, totalParticles, totalTime);
   }
   MPI_Finalize();
   return 0;
