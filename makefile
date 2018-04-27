@@ -1,7 +1,7 @@
-# CC=mpic++
-# CFLAGS=-c -g -Wall -lstdc++
-CC=mpiCC
-CFLAGS=-c -g -Wall -std=c++11
+CC=mpic++
+CFLAGS=-c -g -Wall -lstdc++
+# CC=mpiCC
+# CFLAGS=-c -g -Wall -std=c++11
 LDFLAGS=-lm
 OBJECTS=$(SOURCES:.cpp=.o)
 

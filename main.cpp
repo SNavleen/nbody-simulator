@@ -35,7 +35,6 @@ typedef struct {
   int    radius;
 } Particle;
 
-
 void particlesInit(int                startIndex,
                    int                endIndex,
                    int                width,
@@ -210,12 +209,16 @@ int main(int argc, char *argv[]) {
         imgInit(height, width, image);
         imgUpdate(particlesOld, totalParticles, image, height, width);
         int imageNumber  = i / subSteps;
-        string imageName = argv[9];
-        string extention = ".bmp";
-        imageName += "_";
-        imageName += to_string(imageNumber);
-        imageName += extention;
-        saveBMP(imageName.c_str(), image, width, height);
+        char snum[10];
+        sprintf(snum, "%d", imageNumber); // puts string into buffer
+        // // convert 123 to string [buf]
+        // itoa(imageNumber, snum, 10);
+        char imageName[80];
+        strcpy(imageName, argv[9]);
+        strcat(imageName, "_");
+        strcat(imageName, snum);
+        strcat(imageName, ".bmp");
+        saveBMP(imageName, image, width, height);
       }
     }
   }
